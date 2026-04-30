@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cybercrime Investigation Platform</title>
+    <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+    <!-- Matrix background animation -->
+    <div class="matrix-background">
+        <canvas id="matrix-canvas"></canvas>
+    </div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <h1>CYBERCRIME INVESTIGATION PLATFORM</h1>
+                <span class="nav-icon-right">🛡️</span>
+            </div>
+            <div class="nav-scan-line"></div>
+            <ul class="nav-links">
+                <li><a href="#" onclick="showTab('dashboard')" class="nav-link-active">DASHBOARD</a></li>
+                <li><a href="#" onclick="showTab('log-analysis')">LOG ANALYSIS</a></li>
+                <li><a href="#" onclick="showTab('network-scan')">NETWORK SCAN</a></li>
+                <li><a href="#" onclick="showTab('packet-analysis')">PACKET ANALYSIS</a></li>
+                <li><a href="#" onclick="showTab('threat-intel')">THREAT INTEL</a></li>
+            </ul>
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                <span class="status-text">SYSTEM ONLINE</span>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Tab -->
+            <section id="dashboard" class="tab-content active">
+                <div class="section-header">
+                    <h2 class="dashboard-title">COMMAND CENTER</h2>
+                    <div class="header-line"></div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="stat-card stat-card-1">
+                        <div class="card-scanner"></div>
+                        <h3>LOGS PROCESSED</h3>
+                        <p class="stat-number" id="stat-logs">0</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill w-45"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card-2">
+                        <div class="card-scanner"></div>
+                        <h3>THREATS DETECTED</h3>
+                        <p class="stat-number threat" id="stat-threats">0</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill danger w-75"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card-3">
+                        <div class="card-scanner"></div>
+                        <h3>NETWORKS SCANNED</h3>
+                        <p class="stat-number" id="stat-networks">0</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill w-30"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card-4">
+                        <div class="card-scanner"></div>
+                        <h3>PACKETS ANALYZED</h3>
+                        <p class="stat-number" id="stat-packets">0</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill w-60"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card alert-section">
+                    <div class="card-title-line"></div>
+                    <h3>⚠️ RECENT ALERTS</h3>
+                    <div id="alerts-container" class="alerts-list">
+                        <p class="empty-state">No alerts - System secure</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Log Analysis Tab -->
+            <section id="log-analysis" class="tab-content">
+                <div class="section-header">
+                    <h2>LOG FORENSICS</h2>
+                    <div class="header-line"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title-line"></div>
+                    <h3>📊 UPLOAD & ANALYZE</h3>
+                    <form id="log-form" class="upload-form">
+                        <div class="file-input-wrapper">
+                            <input type="file" id="log-file" accept=".log,.txt,.csv,.json" required>
+                            <label for="log-file" class="file-label">▶ SELECT LOG FILE (log, txt, csv, json)</label>
+                        </div>
+                        <p id="log-filename" class="log-filename-display">✓ <span id="log-filename-text"></span></p>
+                        <button type="submit" class="btn btn-primary">START ANALYSIS</button>
+                    </form>
+                    <div id="log-loading" class="loading hidden">
+                        <div class="spinner-cyber"></div>
+                        <p>ANALYZING LOG FILE...</p>
+                    </div>
+                </div>
+
+                <div id="log-results" class="hidden">
+                    <div class="card">
+                        <div class="card-title-line"></div>
+                        <div class="flex-between">
+                            <h3>📈 ANALYSIS RESULTS</h3>
+                            <div class="flex-gap">
+                                <button onclick="downloadJSON('log-analysis', currentLogData)" class="btn btn-secondary">EXPORT JSON</button>
+                                <button onclick="clearLogResults()" class="btn btn-danger">CLEAR</button>
+                            </div>
+                        </div>
+                        <div class="results-grid">
+                            <div class="result-card">
+                                <h4>TOTAL LINES</h4>
+                                <p id="log-total-lines">-</p>
+                            </div>
+                            <div class="result-card alert">
+                                <h4>THREATS</h4>
+                                <p id="log-threats-count">-</p>
+                            </div>
+                            <div class="result-card">
+                                <h4>UNIQUE IPs</h4>
+                                <p id="log-unique-ips">-</p>
+                            </div>
+                            <div class="result-card">
+                                <h4>ERRORS</h4>
+                                <p id="log-errors">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="card">
+                            <div class="card-title-line"></div>
+                            <h3>⚠️ RISK SCORE</h3>
+                            <div class="flex-center-gap">
+                                <div class="flex-1">
+                                    <div class="progress-bar h-30">
+                                        <div class="progress-fill" id="log-risk-bar"></div>
+                                    </div>
+                                </div>
+                                <p id="log-risk-score" class="risk-score-text">-/100</p>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title-line"></div>
+                            <h3>🎯 THREAT SEVERITY</h3>
+                            <div class="flex-col-gap">
+                                <div><span class="severity-critical">● Critical: </span><span id="log-severity-critical">0</span></div>
+                                <div><span class="severity-high">● High: </span><span id="log-severity-high">0</span></div>
+                                <div><span class="severity-medium">● Medium: </span><span id="log-severity-medium">0</span></div>
+                                <div><span class="severity-low">● Low: </span><span id="log-severity-low">0</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title-line"></div>
+                        <h3>🔍 PATTERN MATCHES</h3>
+                        <div id="log-patterns" class="pattern-grid"></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title-line"></div>
+                        <h3>⚠️ SUSPICIOUS ACTIVITY</h3>
+                        <div id="log-suspicious" class="activity-list"></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title-line"></div>
+                        <h3>🌐 EXTRACTED IPs</h3>
+                        <div id="log-ips" class="ip-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Network Scan Tab -->
+            <section id="network-scan" class="tab-content">
+                <div class="section-header">
+                    <h2>NETWORK RECONNAISSANCE</h2>
+                    <div class="header-line"></div>
+                </div>
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-title-line"></div>
+                        <h3>🎯 NETWORK SCAN</h3>
+                        <form id="network-form" class="form-group">
+                            <div>
+                                <label for="scan-target">TARGET IP/NETWORK:</label>
+                                <input type="text" id="scan-target" placeholder="192.168.1.0/24 or 192.168.1.1" required>
+                            </div>
+                            <div>
+                                <label for="scan-type">SCAN TYPE:</label>
+                                <select id="scan-type">
+                                    <option value="basic">Basic Scan</option>
+                                    <option value="advanced">Advanced Scan</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">INITIATE SCAN</button>
+                        </form>
+                        <div id="network-loading" class="loading hidden">
+                            <div class="spinner-cyber"></div>
+                            <p>SCANNING NETWORK...</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title-line"></div>
+                        <h3>📡 PORT SCAN</h3>
+                        <form id="port-form" class="form-group">
+                            <div>
+                                <label for="port-target">TARGET IP:</label>
+                                <input type="text" id="port-target" placeholder="192.168.1.1" required>
+                            </div>
+                            <div>
+                                <label for="port-range">PORT RANGE:</label>
+                                <input type="text" id="port-range" placeholder="1-1000" value="1-1000">
+                            </div>
+                            <button type="submit" class="btn btn-primary">START SCAN</button>
+                        </form>
+                        <div id="port-loading" class="loading hidden">
+                            <div class="spinner-cyber"></div>
+                            <p>SCANNING PORTS...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="network-results" class="hidden">
+                    <div class="grid-2">
+                        <div class="card">
+                            <div class="card-title-line"></div>
+                            <h3>🔍 SUMMARY</h3>
+                            <div class="flex-col-gap-10">
+                                <div><strong>Active Hosts:</strong> <span id="network-active-count">0</span></div>
+                                <div><strong>Open Ports Found:</strong> <span id="network-open-ports">0</span></div>
+                                <div><strong>Vulnerable Services:</strong> <span id="network-vulnerable">0</span></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title-line"></div>
+                            <h3>⚠️ RISK LEVEL</h3>
+                            <div class="flex-center-gap-15">
+                                <div class="progress-bar flex-1 h-30">
+                                    <div class="progress-fill" id="network-risk-bar"></div>
+                                </div>
+                                <p id="network-risk-level" class="threat-level-text">MEDIUM</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title-line"></div>
+                        <div class="flex-between">
+                            <h3>🖥️ ACTIVE HOSTS</h3>
+                            <button onclick="downloadJSON('network-scan', currentNetworkData)" class="btn btn-secondary">EXPORT JSON</button>
+                        </div>
+                        <div id="network-hosts" class="host-list"></div>
+                    </div>
+                </div>
+
+                <div id="port-results" class="hidden">
+                    <div class="card">
+                        <div class="card-title-line"></div>
+                        <div class="flex-between">
+                            <h3>🔌 OPEN PORTS</h3>
+                            <button onclick="downloadJSON('port-scan', currentPortData)" class="btn btn-secondary">EXPORT JSON</button>
+                        </div>
+                        <div id="port-list" class="port-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Packet Analysis Tab -->
+            <section id="packet-analysis" class="tab-content">
+                <h2>Packet Analysis</h2>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>Upload PCAP File</h3>
+                        <form id="packet-form" class="upload-form">
+                            <div class="file-input-wrapper">
+                                <input type="file" id="packet-file" accept=".pcap,.pcapng" required>
+                                <label for="packet-file" class="file-label">Choose PCAP file</label>
+                            </div>
+                            <div id=\"packet-file-display\" class=\"packet-file-info hidden\">
+                                <strong>📁 Selected File:</strong> <span id="packet-file-name">-</span>
+                            </div>
+                            <div>
+                                <label for="packet-filter">Filter:</label>
+                                <select id="packet-filter">
+                                    <option value="all">All Packets</option>
+                                    <option value="tcp">TCP Only</option>
+                                    <option value="udp">UDP Only</option>
+                                    <option value="dns">DNS Only</option>
+                                    <option value="http">HTTP Only</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Analyze Packets</button>
+                        </form>
+                        <div id="packet-loading" class="loading hidden">
+                            <div class="spinner"></div>
+                            <p>Analyzing packets...</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Live Packet Capture</h3>
+                        <form id="capture-form" class="form-group">
+                            <div>
+                                <label for="capture-interface">Network Interface:</label>
+                                <select id="capture-interface" required>
+                                    <option value="">Loading interfaces...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="capture-count">Packet Count:</label>
+                                <input type="number" id="capture-count" min="1" max="10000" value="50" required>
+                            </div>
+                            <div>
+                                <label for="capture-duration">Timeout (seconds):</label>
+                                <input type="number" id="capture-duration" min="1" max="600" value="30" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Start Capture</button>
+                            <p class="warning-text">⚠️ Requires Administrator/sudo access</p>
+                        </form>
+                        <div id="capture-loading" class="loading hidden">
+                            <div class="spinner"></div>
+                            <p>Capturing packets...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="packet-results" class="hidden">
+                    <div class="grid-2">
+                        <div class="card">
+                            <div class="card-title-line"></div>
+                            <h3>📊 QUICK SUMMARY</h3>
+                            <div class="flex-col-gap-10">
+                                <div><strong>Malicious Packets:</strong> <span id="packet-malicious-count">0</span></div>
+                                <div><strong>Suspicious Connections:</strong> <span id="packet-suspicious-count">0</span></div>
+                                <div><strong>Protocols Detected:</strong> <span id="packet-protocols-count">0</span></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title-line"></div>
+                            <h3>⚠️ DETECTION LEVEL</h3>
+                            <div class="flex-center-gap-15">
+                                <div class="progress-bar flex-1 h-30">
+                                    <div class="progress-fill" id="packet-threat-bar"></div>
+                                </div>
+                                <p id="packet-threat-level" class="packet-threat-text">LOW</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="flex-between">
+                            <div>
+                                <h3>📈 Packet Statistics</h3>
+                                <p class="packet-filename-text"><strong>File:</strong> <span id="packet-filename">-</span></p>
+                            </div>
+                            <div class="flex-gap">
+                                <button onclick="downloadJSON('packet-analysis', currentPacketData)" class="btn btn-secondary">📥 Download JSON</button>
+                                <button onclick="clearPacketResults()" class="btn btn-secondary">🗑️ Clear</button>
+                            </div>
+                        </div>
+                        <div class="results-grid">
+                            <div class="result-card">
+                                <h4>Total Packets</h4>
+                                <p id="packet-count">-</p>
+                            </div>
+                            <div class="result-card">
+                                <h4>TCP Packets</h4>
+                                <p id="packet-tcp">-</p>
+                            </div>
+                            <div class="result-card">
+                                <h4>UDP Packets</h4>
+                                <p id="packet-udp">-</p>
+                            </div>
+                            <div class="result-card">
+                                <h4>DNS Packets</h4>
+                                <p id="packet-dns">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Top Source IPs</h3>
+                        <div id="packet-src-ips" class="ip-list"></div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Top Destination IPs</h3>
+                        <div id="packet-dst-ips" class="ip-list"></div>
+                    </div>
+                </div>
+
+                <div id="capture-results" class="hidden">
+                    <div class="card">
+                        <div class="flex-between">
+                            <h3 id="capture-title">Live Capture Results</h3>
+                            <button onclick="downloadJSON('packet-capture', currentCaptureData)" class="btn btn-secondary">📥 Download JSON</button>
+                        </div>
+                        <div class="results-grid">
+                            <div class="result-card">
+                                <h4>Packets Captured</h4>
+                                <p id="capture-packet-count">0</p>
+                            </div>
+                            <div class="result-card">
+                                <h4>Source IPs</h4>
+                                <p id="capture-src-ip-count">0</p>
+                            </div>
+                            <div class="result-card">
+                                <h4>Destination IPs</h4>
+                                <p id="capture-dst-ip-count">0</p>
+                            </div>
+                            <div class="result-card">
+                                <h4>Protocols Detected</h4>
+                                <p id="capture-protocol-count">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Protocol Distribution</h3>
+                        <div id="capture-protocols" class="pattern-grid"></div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Top Source IPs</h3>
+                        <div id="capture-src-ips" class="ip-list"></div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Top Destination IPs</h3>
+                        <div id="capture-dst-ips" class="ip-list"></div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Captured Packets (First 20)</h3>
+                        <div id="capture-detailed-packets" class="packets-list"></div>
+                    </div>
+                
+            </section>
+
+            <!-- Threat Intelligence Tab -->
+            <section id="threat-intel" class="tab-content">
+                <h2>Threat Intelligence</h2>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>Check IP Reputation</h3>
+                        <form id="ip-reputation-form" class="form-group">
+                            <div>
+                                <label for="ip-check">IP Address:</label>
+                                <input type="text" id="ip-check" placeholder="192.168.1.1" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Check Reputation</button>
+                        </form>
+                        <div id="ip-reputation-result" class="hidden">
+                            <div class="flex-between margin-bottom-15">
+                                <h4>Result</h4>
+                                <button onclick="downloadJSON('ip-reputation', currentIpReputationData)" class="btn btn-secondary">📥 Download JSON</button>
+                            </div>
+                            <div id="ip-reputation-content"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Threat Analysis</h3>
+                        <form id="threat-form" class="form-group">
+                            <div>
+                                <label for="threat-type">Threat Type:</label>
+                                <select id="threat-type">
+                                    <option value="sql_injection">SQL Injection</option>
+                                    <option value="xss_attack">XSS Attack</option>
+                                    <option value="dos_attack">DoS Attack</option>
+                                    <option value="brute_force">Brute Force</option>
+                                    <option value="malware">Malware</option>
+                                    <option value="privilege_escalation">Privilege Escalation</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Get Analysis</button>
+                        </form>
+                        <div id="threat-analysis-result" class="hidden">
+                            <div class="flex-between margin-bottom-15">
+                                <h4>Analysis Details</h4>
+                                <button onclick="downloadJSON('threat-analysis', currentThreatAnalysisData)" class="btn btn-secondary">📥 Download JSON</button>
+                            </div>
+                            <div id="threat-analysis-content"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>🕷️ Website Scraper</h3>
+                        <form id="scrape-form" class="form-group">
+                            <div>
+                                <label for="scrape-url">Website URL or IP:</label>
+                                <input type="text" id="scrape-url" placeholder="https://example.com or 192.168.1.1" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">SCRAPE WEBSITE</button>
+                        </form>
+                        <div id="scrape-loading" class="loading hidden">
+                            <div class="spinner-cyber"></div>
+                            <p>SCANNING WEBSITE...</p>
+                        </div>
+                        <div id="scrape-results" class="hidden">
+                            <div class="flex-between margin-bottom-15">
+                                <h4>Scraping Results</h4>
+                                <button onclick="downloadJSON('website-scrape', currentScrapedData)" class="btn btn-secondary">📥 Download JSON</button>
+                            </div>
+                            <div id="scrape-content"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="threat-detection-results" class="hidden">
+                    <div class="grid-2">
+                        <div class="card">
+                            <div class="card-title-line"></div>
+                            <h3>📊 STATISTICS</h3>
+                            <div class="threat-statistics">
+                                <div><strong>Total IPs Checked:</strong> <span id="threat-ips-checked">0</span></div>
+                                <div><strong>Blacklisted Found:</strong> <span id="threat-blacklisted-count">0</span></div>
+                                <div><strong>URLs Extracted:</strong> <span id="threat-urls-count">0</span></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title-line"></div>
+                            <h3>🎯 THREAT LEVEL</h3>
+                            <div class="flex-center-gap-15">
+                                <div class="progress-bar flex-1 h-30">
+                                    <div class="progress-fill" id="threat-level-bar"></div>
+                                </div>
+                                <p id="threat-overall-level" class="overall-threat-text">MEDIUM</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>🔴 Detected Threats</h3>
+                        <div id="threat-list" class="threat-list"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="static/script.js"></script>
+</body>
+</html>
