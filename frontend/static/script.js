@@ -11,18 +11,108 @@ let currentIpReputationData = null;
 let currentThreatAnalysisData = null;
 let currentScrapedData = null;
 
-// Dashboard Stats (stored in localStorage for persistence)
+// ==================== SUSPICIOUS IP ALERT SYSTEM ====================
+function generateBeep(frequency = 800, duration = 300) {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = frequency;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration / 1000);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + duration / 1000);
+    } catch (e) {
+        console.log('Audio context not available, beep skipped');
+    }
+}
+
+function playAlertBeep() {
+    // Play triple beep for alert
+    generateBeep(900, 200);
+    setTimeout(() => generateBeep(900, 200), 250);
+    setTimeout(() => generateBeep(900, 300), 500);
+}
+
+function showAlertModal(ipAddress, threatType, severity, details) {
+    const overlay = document.getElementById('alert-modal-overlay');
+    if (overlay) {
+        // Update modal content
+        document.getElementById('alert-ip-text').textContent = ipAddress;
+        document.getElementById('alert-type-text').textContent = threatType;
+        document.getElementById('alert-severity-text').textContent = severity;
+        document.getElementById('alert-details-text').textContent = details;
+        
+        // Show overlay
+        overlay.classList.add('show');
+        
+        // Prevent background scrolling
+        document.body.style.overflow = 'hidden';
+        
+        // Play beep sound
+        playAlertBeep();
+        
+        // Auto-close after 15 seconds
+        setTimeout(() => {
+            closeAlertModal();
+        }, 15000);
+    }
+}
+
+function closeAlertModal() {
+    const overlay = document.getElementById('alert-modal-overlay');
+    if (overlay) {
+        overlay.classList.remove('show');
+        // Re-enable background scrolling
+        document.body.style.overflow = 'auto';
+    }
+}
+
+function investigateIP() {
+    const ipText = document.getElementById('alert-ip-text').textContent;
+    closeAlertModal();
+    // Switch to network scan tab
+    showTab('network-scan');
+    document.getElementById('scan-target').value = ipText;
+    alert(`Switched to Network Scan tab. You can now scan IP: ${ipText}`);
+}
+
+// Dashboard Stats (initialize to 0 at session start)
 let dashboardStats = {
-    logs_processed: parseInt(localStorage.getItem('logs_processed') || '0'),
-    threats_detected: parseInt(localStorage.getItem('threats_detected') || '0'),
-    networks_scanned: parseInt(localStorage.getItem('networks_scanned') || '0'),
-    packets_analyzed: parseInt(localStorage.getItem('packets_analyzed') || '0')
+    logs_processed: 0,
+    threats_detected: 0,
+    networks_scanned: 0,
+    packets_analyzed: 0
 };
+
+// Helper function to get auth token
+function getAuthToken() {
+    return localStorage.getItem('authToken') || '';
+}
+
+// Helper function to make API requests with auth
+async function apiRequest(url, options = {}) {
+    const headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${getAuthToken()}`
+    };
+    
+    return fetch(url, {
+        ...options,
+        headers
+    });
+}
 
 // Update dashboard stat and show animation
 function updateDashboardStat(statName, increment = 1) {
     dashboardStats[statName] += increment;
-    localStorage.setItem(statName, dashboardStats[statName]);
     
     const statMap = {
         'logs_processed': 'stat-logs',
@@ -44,10 +134,15 @@ function updateDashboardStat(statName, increment = 1) {
 
 // Initialize dashboard stats from localStorage
 function initDashboardStats() {
-    document.getElementById('stat-logs').textContent = dashboardStats.logs_processed;
-    document.getElementById('stat-threats').textContent = dashboardStats.threats_detected;
-    document.getElementById('stat-networks').textContent = dashboardStats.networks_scanned;
-    document.getElementById('stat-packets').textContent = dashboardStats.packets_analyzed;
+    const statLogs = document.getElementById('stat-logs');
+    const statThreats = document.getElementById('stat-threats');
+    const statNetworks = document.getElementById('stat-networks');
+    const statPackets = document.getElementById('stat-packets');
+    
+    if (statLogs) statLogs.textContent = dashboardStats.logs_processed;
+    if (statThreats) statThreats.textContent = dashboardStats.threats_detected;
+    if (statNetworks) statNetworks.textContent = dashboardStats.networks_scanned;
+    if (statPackets) statPackets.textContent = dashboardStats.packets_analyzed;
 }
 
 // Matrix Rain Animation
@@ -169,7 +264,7 @@ document.getElementById('log-form')?.addEventListener('submit', async (e) => {
     loading.classList.remove('hidden');
     
     try {
-        const response = await fetch(`${API_BASE}/analyze-log`, {
+        const response = await apiRequest(`${API_BASE}/analyze-log`, {
             method: 'POST',
             body: formData
         });
@@ -217,14 +312,50 @@ function displayLogResults(analysis) {
     document.getElementById('log-severity-medium').textContent = medium;
     document.getElementById('log-severity-low').textContent = low;
     
+    // Enhanced pattern display with threat indicators
     const patternDiv = document.getElementById('log-patterns');
     patternDiv.innerHTML = '';
-    for (const [pattern, count] of Object.entries(analysis.matched_patterns || {})) {
+    
+    // Define threat severity for patterns
+    const patternThreatMap = {
+        'sql_injection': 'CRITICAL',
+        'xss_attack': 'CRITICAL',
+        'malware': 'CRITICAL',
+        'command_injection': 'CRITICAL',
+        'port_scan': 'HIGH',
+        'brute_force': 'HIGH',
+        'dos_attack': 'HIGH',
+        'unauthorized_access': 'HIGH',
+        'suspicious_login': 'MEDIUM',
+        'failed_login': 'MEDIUM'
+    };
+    
+    const patternEmojis = {
+        'sql_injection': '💉',
+        'xss_attack': '🧬',
+        'malware': '🦠',
+        'command_injection': '⚙️',
+        'port_scan': '🔍',
+        'brute_force': '🔐',
+        'dos_attack': '💥',
+        'unauthorized_access': '⛔',
+        'suspicious_login': '⚠️',
+        'failed_login': '❌'
+    };
+    
+    const sortedPatterns = Object.entries(analysis.matched_patterns || {})
+        .sort((a, b) => b[1] - a[1]);
+    
+    sortedPatterns.forEach(([pattern, count]) => {
         const item = document.createElement('div');
         item.className = 'pattern-item';
-        item.innerHTML = `<h5>${pattern}</h5><p>Found: <strong>${count}</strong> matches</p>`;
+        const threatLevel = patternThreatMap[pattern] || 'MEDIUM';
+        const emoji = patternEmojis[pattern] || '⚡';
+        const percentage = ((count / (critical + high + medium + low)) * 100).toFixed(1);
+        
+        item.innerHTML = `<h5>${emoji} ${pattern.toUpperCase().replace(/_/g, ' ')}</h5>\n                        <p>Detections: <strong>${count}</strong> (${percentage}%)</p>\n                        <p>Threat Level: <strong>${threatLevel}</strong></p>`;
         patternDiv.appendChild(item);
-    }
+    });
     
     const suspiciousDiv = document.getElementById('log-suspicious');
     suspiciousDiv.innerHTML = '';
@@ -245,16 +376,375 @@ function displayLogResults(analysis) {
     
     const ipsDiv = document.getElementById('log-ips');
     ipsDiv.innerHTML = '';
+    const suspiciousIPs = {
+        '192.168.1.1': { type: 'Port Scanner', severity: 'MEDIUM' },
+        '10.0.0.1': { type: 'Botnet Command', severity: 'HIGH' }
+    };
+    
     if (analysis.unique_ips && analysis.unique_ips.length > 0) {
         analysis.unique_ips.forEach(ip => {
             const item = document.createElement('div');
             item.className = 'ip-item';
-            item.innerHTML = `<p><strong>IP:</strong> ${ip}</p>`;
+            
+            // Check if IP is suspicious
+            if (suspiciousIPs[ip]) {
+                item.innerHTML = `<p><strong>⚠️ SUSPICIOUS IP:</strong> ${ip}</p>`;
+                // Show alert modal for suspicious IP
+                setTimeout(() => {
+                    showAlertModal(
+                        ip,
+                        suspiciousIPs[ip].type,
+                        suspiciousIPs[ip].severity,
+                        `IP ${ip} detected as ${suspiciousIPs[ip].type} in log analysis`
+                    );
+                }, 500);
+            } else {
+                item.innerHTML = `<p><strong>IP:</strong> ${ip}</p>`;
+            }
+            
             ipsDiv.appendChild(item);
         });
     } else {
         ipsDiv.innerHTML = '<p class="empty-state">No IPs found</p>';
     }
+    
+    // Render charts
+    setTimeout(() => {
+        renderThreatLevelsChart(analysis);
+        renderPatternMatchesChart(analysis);
+        renderThreatSummaryChart(analysis);
+    }, 100);
+    
+    // Display filename
+    document.getElementById('log-filename').textContent = 'File analyzed successfully';
+    document.getElementById('log-filename').style.display = 'block';
+}
+
+// Chart rendering functions for Log Analysis
+window.logChartsInstances = {};
+
+function renderThreatLevelsChart(analysis) {
+    const ctx = document.getElementById('log-threats-chart');
+    if (!ctx) return;
+    
+    // Destroy existing chart if it exists
+    if (window.logChartsInstances.threatLevels) {
+        window.logChartsInstances.threatLevels.destroy();
+    }
+    
+    const critical = analysis.threat_levels?.critical || 0;
+    const high = analysis.threat_levels?.high || 0;
+    const medium = analysis.threat_levels?.medium || 0;
+    const low = analysis.threat_levels?.low || 0;
+    const total = critical + high + medium + low;
+    
+    const criticalPct = total > 0 ? ((critical / total) * 100).toFixed(1) : 0;
+    const highPct = total > 0 ? ((high / total) * 100).toFixed(1) : 0;
+    const mediumPct = total > 0 ? ((medium / total) * 100).toFixed(1) : 0;
+    const lowPct = total > 0 ? ((low / total) * 100).toFixed(1) : 0;
+    
+    window.logChartsInstances.threatLevels = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: [
+                `🔴 CRITICAL\n${critical} (${criticalPct}%)`,
+                `🟠 HIGH\n${high} (${highPct}%)`,
+                `🟡 MEDIUM\n${medium} (${mediumPct}%)`,
+                `🟢 LOW\n${low} (${lowPct}%)`
+            ],
+            datasets: [{
+                data: [critical, high, medium, low],
+                backgroundColor: [
+                    '#ff4444',
+                    '#ff8800',
+                    '#ffbb00',
+                    '#00bb00'
+                ],
+                borderColor: '#0a0a0a',
+                borderWidth: 3,
+                hoverBorderColor: '#00ff00',
+                hoverBorderWidth: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#00ff00',
+                        font: { size: 14, family: "'Courier New', monospace", weight: 'bold' },
+                        padding: 20,
+                        generateLabels: (chart) => {
+                            const data = chart.data;
+                            return data.labels.map((label, i) => ({
+                                text: label,
+                                fillStyle: data.datasets[0].backgroundColor[i],
+                                hidden: false,
+                                index: i
+                            }));
+                        }
+                    }
+                },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    titleColor: '#00ff00',
+                    bodyColor: '#00ff00',
+                    borderColor: '#00ff00',
+                    borderWidth: 2,
+                    padding: 15,
+                    titleFont: { size: 15, weight: 'bold' },
+                    bodyFont: { size: 14 },
+                    displayColors: true,
+                    callbacks: {
+                        title: (context) => `THREAT LEVEL: ${context[0].label.split('\n')[0]}`,
+                        label: (context) => {
+                            const value = context.parsed;
+                            const pct = ((value / total) * 100).toFixed(1);
+                            return `Count: ${value} | Percentage: ${pct}%`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderPatternMatchesChart(analysis) {
+    const ctx = document.getElementById('log-patterns-chart');
+    if (!ctx) return;
+    
+    // Destroy existing chart if it exists
+    if (window.logChartsInstances.patternMatches) {
+        window.logChartsInstances.patternMatches.destroy();
+    }
+    
+    const patterns = analysis.matched_patterns || {};
+    const entries = Object.entries(patterns).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const labels = entries.map(e => e[0]);
+    const data = entries.map(e => e[1]);
+    const total = data.reduce((a, b) => a + b, 0);
+    
+    // Dynamic colors based on threat severity
+    const patternColors = {
+        'sql_injection': '#ff0000',
+        'xss_attack': '#ff4444',
+        'port_scan': '#ff8800',
+        'brute_force': '#ffbb00',
+        'malware': '#ff0000',
+        'dos_attack': '#ff5500',
+        'command_injection': '#ff2222',
+        'unauthorized_access': '#ff9900',
+        'suspicious_login': '#ffaa00',
+        'failed_login': '#ffcc00'
+    };
+    
+    const backgroundColors = labels.map(label => patternColors[label] || '#00bbff');
+    
+    window.logChartsInstances.patternMatches = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels.map(l => l.toUpperCase().replace(/_/g, ' ')),
+            datasets: [{
+                label: 'Total Detections',
+                data: data,
+                backgroundColor: backgroundColors,
+                borderColor: '#ffffff',
+                borderWidth: 2,
+                hoverBackgroundColor: '#00ff00',
+                hoverBorderColor: '#00ff00'
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#00ff00',
+                        font: { size: 14, weight: 'bold', family: "'Courier New', monospace" },
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    titleColor: '#00ff00',
+                    bodyColor: '#00ff00',
+                    borderColor: '#00ff00',
+                    borderWidth: 2,
+                    padding: 15,
+                    titleFont: { size: 15, weight: 'bold' },
+                    bodyFont: { size: 14 },
+                    callbacks: {
+                        title: (context) => `⚠️ ${context[0].label}`,
+                        label: (context) => {
+                            const value = context.parsed.x;
+                            const pct = ((value / total) * 100).toFixed(1);
+                            return [`Detections: ${value}`, `Percentage: ${pct}%`];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#00ff00',
+                        font: { family: "'Courier New', monospace", weight: 'bold', size: 13 },
+                        callback: (value) => value + ''
+                    },
+                    grid: {
+                        color: 'rgba(0, 255, 0, 0.1)',
+                        drawBorder: true,
+                        borderColor: '#00ff00'
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: '#00ff00',
+                        font: { family: "'Courier New', monospace", size: 12, weight: 'bold' }
+                    },
+                    grid: {
+                        color: 'rgba(0, 255, 0, 0.05)',
+                        drawBorder: true
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderThreatSummaryChart(analysis) {
+    const ctx = document.getElementById('log-summary-chart');
+    if (!ctx) return;
+    
+    // Destroy existing chart if it exists
+    if (window.logChartsInstances.threatSummary) {
+        window.logChartsInstances.threatSummary.destroy();
+    }
+    
+    const totalLines = analysis.total_lines || 1;
+    const critical = analysis.threat_levels?.critical || 0;
+    const high = analysis.threat_levels?.high || 0;
+    const medium = analysis.threat_levels?.medium || 0;
+    const low = analysis.threat_levels?.low || 0;
+    const clean = Math.max(0, totalLines - (critical + high + medium + low));
+    
+    const criticalPct = ((critical / totalLines) * 100).toFixed(1);
+    const highPct = ((high / totalLines) * 100).toFixed(1);
+    const mediumPct = ((medium / totalLines) * 100).toFixed(1);
+    const lowPct = ((low / totalLines) * 100).toFixed(1);
+    const cleanPct = ((clean / totalLines) * 100).toFixed(1);
+    
+    const threatCount = critical + high + medium + low;
+    const threatRiskScore = Math.min(100, Math.round((critical * 25 + high * 15 + medium * 8 + low * 2) / totalLines * 100));
+    
+    window.logChartsInstances.threatSummary = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [
+                `🔴 CRITICAL\n${critical} (${criticalPct}%)`,
+                `🟠 HIGH\n${high} (${highPct}%)`,
+                `🟡 MEDIUM\n${medium} (${mediumPct}%)`,
+                `🟢 LOW\n${low} (${lowPct}%)`,
+                `✅ CLEAN\n${clean} (${cleanPct}%)`
+            ],
+            datasets: [{
+                label: 'Log Lines Distribution',
+                data: [critical, high, medium, low, clean],
+                backgroundColor: [
+                    '#ff4444',
+                    '#ff8800',
+                    '#ffbb00',
+                    '#00bb00',
+                    '#004400'
+                ],
+                borderColor: [
+                    '#ff0000',
+                    '#ff5500',
+                    '#ffaa00',
+                    '#00aa00',
+                    '#003300'
+                ],
+                borderWidth: 2,
+                hoverBackgroundColor: [
+                    '#ff6666',
+                    '#ffaa33',
+                    '#ffdd33',
+                    '#33ff33',
+                    '#00aa00'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#00ff00',
+                        font: { size: 14, weight: 'bold', family: "'Courier New', monospace" },
+                        padding: 15
+                    }
+                },
+                title: {
+                    display: true,
+                    text: `RISK SCORE: ${threatRiskScore}/100 | THREATS: ${threatCount}/${totalLines}`,
+                    color: threatRiskScore > 70 ? '#ff4444' : threatRiskScore > 40 ? '#ffbb00' : '#00ff00',
+                    font: { size: 15, weight: 'bold', family: "'Courier New', monospace" },
+                    padding: 20
+                },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    titleColor: '#00ff00',
+                    bodyColor: '#00ff00',
+                    borderColor: '#00ff00',
+                    borderWidth: 2,
+                    padding: 15,
+                    titleFont: { size: 15, weight: 'bold' },
+                    bodyFont: { size: 14 },
+                    callbacks: {
+                        title: (context) => `${context[0].label.split('\n')[0]}`,
+                        label: (context) => {
+                            const value = context.parsed.y;
+                            const pct = ((value / totalLines) * 100).toFixed(1);
+                            return `Lines: ${value} (${pct}% of total)`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#00ff00',
+                        font: { family: "'Courier New', monospace", weight: 'bold', size: 13 },
+                        callback: (value) => value + ''
+                    },
+                    grid: {
+                        color: 'rgba(0, 255, 0, 0.1)',
+                        drawBorder: true,
+                        borderColor: '#00ff00'
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: '#00ff00',
+                        font: { family: "'Courier New', monospace", size: 12, weight: 'bold' }
+                    },
+                    grid: {
+                        color: 'rgba(0, 255, 0, 0.05)',
+                        drawBorder: true
+                    }
+                }
+            }
+        }
+    });
 }
 
 function clearLogResults() {
@@ -262,6 +752,14 @@ function clearLogResults() {
     document.getElementById('log-form').reset();
     document.getElementById('log-filename').style.display = 'none';
     currentLogData = null;
+    
+    // Destroy charts if they exist
+    if (window.logChartsInstances) {
+        Object.values(window.logChartsInstances).forEach(chart => {
+            if (chart) chart.destroy();
+        });
+        window.logChartsInstances = {};
+    }
 }
 
 // Network Scanning
@@ -282,7 +780,7 @@ document.getElementById('network-form')?.addEventListener('submit', async (e) =>
     results.classList.add('hidden');
     
     try {
-        const response = await fetch(`${API_BASE}/scan-network`, {
+        const response = await apiRequest(`${API_BASE}/scan-network`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ target, scan_type: scanType })
@@ -337,6 +835,12 @@ function displayNetworkResults(results) {
         document.getElementById('network-risk-level').style.color = '#ff6b6b';
     }
     
+    // List of known suspicious IPs
+    const suspiciousIPs = {
+        '192.168.1.1': { type: 'Port Scanner', severity: 'MEDIUM' },
+        '10.0.0.1': { type: 'Botnet Command', severity: 'HIGH' }
+    };
+    
     if (hosts && hosts.length > 0) {
         hosts.forEach(host => {
             const item = document.createElement('div');
@@ -346,25 +850,44 @@ function displayNetworkResults(results) {
             const hostname = host.hostname || 'N/A';
             const status = host.alive ? '✓ ALIVE' : '✗ OFFLINE';
             
+            // Check if IP is suspicious
+            let isSuspicious = false;
+            let suspiciousMarker = '';
+            if (suspiciousIPs[ip]) {
+                isSuspicious = true;
+                suspiciousMarker = '⚠️ ';
+            }
+            
             let portsHtml = '';
             if (host.open_ports && host.open_ports.length > 0) {
                 portsHtml = host.open_ports.map(p => `${p.port}/${p.service}`).join(', ');
             }
             
             item.innerHTML = `
-                <p><strong>IP:</strong> ${ip}</p>
+                <p><strong>${suspiciousMarker}IP:</strong> ${ip}</p>
                 <p><strong>Status:</strong> ${status}</p>
                 ${hostname !== 'N/A' ? `<p><strong>Hostname:</strong> ${hostname}</p>` : ''}
                 ${portsHtml ? `<p><strong>Open Ports:</strong> ${portsHtml}</p>` : ''}
             `;
             hostsDiv.appendChild(item);
+            
+            // Show alert for suspicious IP
+            if (isSuspicious && host.alive) {
+                setTimeout(() => {
+                    showAlertModal(
+                        ip,
+                        suspiciousIPs[ip].type,
+                        suspiciousIPs[ip].severity,
+                        `Suspicious IP ${ip} detected during network scan with ${portsHtml ? 'open ports: ' + portsHtml : 'no open ports'}`
+                    );
+                }, 800);
+            }
         });
     } else {
         hostsDiv.innerHTML = '<p class="empty-state">No active hosts found</p>';
     }
 }
 
-// Port Scanning
 // Port Scanning
 document.getElementById('port-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -390,7 +913,7 @@ document.getElementById('port-form')?.addEventListener('submit', async (e) => {
     results.classList.add('hidden');
     
     try {
-        const response = await fetch(`${API_BASE}/scan-port`, {
+        const response = await apiRequest(`${API_BASE}/scan-port`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ target, ports })
@@ -417,11 +940,30 @@ function displayPortResults(results) {
     const portDiv = document.getElementById('port-list');
     portDiv.innerHTML = '';
     
+    // List of known suspicious IPs
+    const suspiciousIPs = {
+        '192.168.1.1': { type: 'Port Scanner', severity: 'MEDIUM' },
+        '10.0.0.1': { type: 'Botnet Command', severity: 'HIGH' }
+    };
+    
+    // Check if the scanned target is suspicious
+    const targetIP = results.target;
+    if (suspiciousIPs[targetIP]) {
+        setTimeout(() => {
+            showAlertModal(
+                targetIP,
+                suspiciousIPs[targetIP].type,
+                suspiciousIPs[targetIP].severity,
+                `Port scan of suspicious IP ${targetIP} found ${results.open_ports_count} open ports`
+            );
+        }, 500);
+    }
+    
     // Display summary
     const summary = document.createElement('div');
     summary.className = 'results-summary';
     summary.innerHTML = `
-        <p><strong>Target:</strong> ${results.target}</p>
+        <p><strong>${suspiciousIPs[targetIP] ? '⚠️ ' : ''}Target:</strong> ${results.target}</p>
         <p><strong>Ports Scanned:</strong> ${results.total_scanned}</p>
         <p><strong>Open Ports Found:</strong> ${results.open_ports_count}</p>
         <p><strong>Scan Range:</strong> ${results.scan_range || 'N/A'}</p>
@@ -472,7 +1014,7 @@ document.getElementById('packet-form')?.addEventListener('submit', async (e) => 
     results.classList.add('hidden');
     
     try {
-        const response = await fetch(`${API_BASE}/analyze-packets`, {
+        const response = await apiRequest(`${API_BASE}/analyze-packets`, {
             method: 'POST',
             body: formData
         });
@@ -581,6 +1123,108 @@ function clearPacketResults() {
     document.getElementById('packet-file').value = '';
 }
 
+// Live Packet Capture Form Handler
+document.getElementById('capture-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const interfaceSelect = document.getElementById('capture-interface');
+    const interface_name = interfaceSelect.value;
+    
+    if (!interface_name) {
+        alert('Please select a network interface');
+        return;
+    }
+    
+    const packet_count = parseInt(document.getElementById('capture-count').value) || 50;
+    const duration = parseInt(document.getElementById('capture-duration').value) || 30;
+    const loading = document.getElementById('capture-loading');
+    const results = document.getElementById('capture-results');
+    
+    loading.classList.remove('hidden');
+    if (results) results.classList.add('hidden');
+    
+    try {
+        const response = await fetch(`${API_BASE}/capture-packets`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                interface: interface_name,
+                count: packet_count,
+                duration: duration
+            })
+        });
+        
+        const data = await response.json();
+        loading.classList.add('hidden');
+        
+        if (data.status === 'success' || data.packets_captured !== undefined) {
+            currentCaptureData = data;
+            displayCaptureResults(data);
+            if (results) results.classList.remove('hidden');
+            updateDashboardStat('packets_analyzed');
+        } else {
+            const errorMsg = data.error || data.message || 'Unknown error occurred';
+            alert('Packet Capture Error:\n' + errorMsg);
+        }
+    } catch (error) {
+        console.error('Capture Error:', error);
+        loading.classList.add('hidden');
+        alert('Failed to capture packets:\n' + error.message);
+    }
+});
+
+function displayCaptureResults(data) {
+    // Update packet count
+    const countEl = document.getElementById('capture-packet-count');
+    if (countEl) countEl.textContent = data.packets_captured || 0;
+    
+    // Display protocol distribution
+    const protocols = data.protocols || {};
+    const protocolsDiv = document.getElementById('capture-protocols');
+    if (protocolsDiv) {
+        protocolsDiv.innerHTML = Object.entries(protocols)
+            .map(([protocol, count]) => `
+                <div class="pattern-item">
+                    <span class="pattern-name">${protocol}</span>
+                    <span class="pattern-count">${count}</span>
+                </div>
+            `).join('') || '<p>No protocols captured</p>';
+    }
+    
+    // Display source IPs
+    const srcIps = data.src_ips || {};
+    const srcDiv = document.getElementById('capture-src-ips');
+    if (srcDiv) {
+        srcDiv.innerHTML = Object.entries(srcIps).slice(0, 10)
+            .map(([ip, count]) => `<div><strong>${ip}</strong>: ${count} packets</div>`)
+            .join('') || '<p>No source IPs captured</p>';
+    }
+    
+    // Display destination IPs
+    const dstIps = data.dst_ips || {};
+    const dstDiv = document.getElementById('capture-dst-ips');
+    if (dstDiv) {
+        dstDiv.innerHTML = Object.entries(dstIps).slice(0, 10)
+            .map(([ip, count]) => `<div><strong>${ip}</strong>: ${count} packets</div>`)
+            .join('') || '<p>No destination IPs captured</p>';
+    }
+    
+    // Display detailed packets
+    const packets = data.detailed_packets || [];
+    const packetsDiv = document.getElementById('capture-detailed-packets');
+    if (packetsDiv) {
+        packetsDiv.innerHTML = packets.slice(0, 20)
+            .map(packet => `
+                <div class="packet-item">
+                    <strong>${packet.protocol || 'Unknown'}</strong> - 
+                    ${packet.src_ip || 'Unknown'} → ${packet.dst_ip || 'Unknown'}
+                    ${packet.dns_query ? ` (DNS: ${packet.dns_query})` : ''}
+                    <br><small>Size: ${packet.size || 0} bytes</small>
+                </div>
+            `).join('') || '<p>No packets captured</p>';
+    }
+}
+
 // IP Reputation Check
 document.getElementById('ip-reputation-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -599,7 +1243,7 @@ document.getElementById('ip-reputation-form')?.addEventListener('submit', async 
     }
     
     try {
-        const response = await fetch(`${API_BASE}/check-ip-reputation`, {
+        const response = await apiRequest(`${API_BASE}/check-ip-reputation`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ip })
@@ -652,7 +1296,7 @@ document.getElementById('threat-form')?.addEventListener('submit', async (e) => 
     }
     
     try {
-        const response = await fetch(`${API_BASE}/threat-analysis/${threatType}`, {
+        const response = await apiRequest(`${API_BASE}/threat-analysis/${threatType}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -752,7 +1396,7 @@ document.getElementById('scrape-form')?.addEventListener('submit', async (e) => 
     results.classList.add('hidden');
     
     try {
-        const response = await fetch(`${API_BASE}/scrape-website`, {
+        const response = await apiRequest(`${API_BASE}/scrape-website`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
@@ -879,34 +1523,73 @@ function displayScrapedWebsite(data) {
     content.innerHTML = html;
 }
 
-// Initialize
+// Initialize - Only run if dashboard is visible
 document.addEventListener('DOMContentLoaded', () => {
+    // Check if we're in dashboard view
+    const dashboardContainer = document.getElementById('dashboard-container');
+    if (!dashboardContainer || dashboardContainer.classList.contains('hidden')) {
+        return; // Don't initialize dashboard functions while on login
+    }
+    
     initMatrixRain();
     initDashboardStats();
     
-    // Load packet interfaces
+    // Load packet interfaces with error handling
     fetch(`${API_BASE}/packet-interfaces`)
         .then(r => r.json())
         .then(data => {
             const select = document.getElementById('capture-interface');
-            if (select && data.interfaces) {
+            if (select) {
                 select.innerHTML = '';
-                data.interfaces.forEach(iface => {
-                    const option = document.createElement('option');
-                    option.value = iface;
-                    option.textContent = iface;
-                    select.appendChild(option);
-                });
+                
+                if (data.interfaces && data.interfaces.length > 0) {
+                    // Add default option
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = '-- Select Network Interface --';
+                    defaultOption.disabled = true;
+                    defaultOption.selected = true;
+                    select.appendChild(defaultOption);
+                    
+                    // Add available interfaces
+                    data.interfaces.forEach(iface => {
+                        const option = document.createElement('option');
+                        option.value = iface;
+                        option.textContent = iface;
+                        select.appendChild(option);
+                    });
+                    
+                    // Remove loading text
+                    const loadingOption = select.querySelector('option[disabled][selected]');
+                    if (loadingOption && loadingOption.textContent.includes('Loading')) {
+                        loadingOption.remove();
+                    }
+                } else {
+                    // No interfaces found - provide help
+                    const helpOption = document.createElement('option');
+                    helpOption.value = '';
+                    helpOption.textContent = '❌ No interfaces detected';
+                    helpOption.disabled = true;
+                    select.appendChild(helpOption);
+                }
             }
         })
-        .catch(e => console.log('Could not load interfaces:', e));
-    
-    // Initialize dashboard stats
-    updateDashboardStats();
+        .catch(err => {
+            console.log('Packet interfaces unavailable:', err);
+            const select = document.getElementById('capture-interface');
+            if (select) {
+                select.innerHTML = '';
+                const errorOption = document.createElement('option');
+                errorOption.value = '';
+                errorOption.textContent = '⚠️ Backend not running - Start Python backend first';
+                errorOption.disabled = true;
+                select.appendChild(errorOption);
+            }
+        });
 });
 
 function updateDashboardStats() {
-    fetch(`${API_BASE}/dashboard-stats`)
+    apiRequest(`${API_BASE}/dashboard-stats`)
         .then(r => r.json())
         .then(data => {
             document.getElementById('stat-logs').textContent = data.total_logs_processed || 0;
@@ -921,3 +1604,304 @@ function updateDashboardStats() {
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.nav-links a')[0]?.classList.add('nav-link-active');
 });
+
+// Show dashboard after login
+function showDashboard() {
+    const loginContainer = document.getElementById('login-container');
+    const dashboardContainer = document.getElementById('dashboard-container');
+    
+    if (loginContainer) {
+        loginContainer.classList.add('hidden');
+    }
+    if (dashboardContainer) {
+        dashboardContainer.classList.remove('hidden');
+        
+        // Initialize dashboard
+        initMatrixRain();
+        initDashboardStats();
+        
+        // Load packet interfaces immediately
+        loadPacketInterfaces();
+        
+        // Trigger dashboard loaded event to start auto-packet capture
+        document.dispatchEvent(new Event('dashboardLoaded'));
+    }
+}
+
+// New function to load packet interfaces
+function loadPacketInterfaces() {
+    const captureInterface = document.getElementById('capture-interface');
+    if (!captureInterface) return;
+    
+    fetch(`${API_BASE}/packet-interfaces`)
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(data => {
+            if (data.interfaces && data.interfaces.length > 0) {
+                // Clear dropdown completely
+                captureInterface.innerHTML = '';
+                
+                // Add each interface
+                data.interfaces.forEach(iface => {
+                    const option = document.createElement('option');
+                    option.value = iface;
+                    option.textContent = iface;
+                    captureInterface.appendChild(option);
+                });
+                
+                console.log('Packet interfaces loaded successfully:', data.interfaces);
+            } else {
+                captureInterface.innerHTML = '<option value="">No interfaces available</option>';
+                console.warn('No packet interfaces available from backend');
+            }
+        })
+        .catch(err => {
+            console.error('Failed to load packet interfaces:', err);
+            captureInterface.innerHTML = '<option value="">Error loading interfaces</option>';
+        });
+}
+
+// Logout function
+function logout() {
+    // Clear stored authentication
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('username');
+    
+    // Show login and hide dashboard
+    const loginContainer = document.getElementById('login-container');
+    const dashboardContainer = document.getElementById('dashboard-container');
+    
+    if (loginContainer) {
+        loginContainer.classList.remove('hidden');
+    }
+    if (dashboardContainer) {
+        dashboardContainer.classList.add('hidden');
+    }
+    
+    // Reset dashboard stats
+    dashboardStats = {
+        logs_processed: 0,
+        threats_detected: 0,
+        networks_scanned: 0,
+        packets_analyzed: 0
+    };
+    
+    // Reset form
+    if (window.authController) {
+        window.authController.loginForm.reset();
+        window.authController.signupForm.reset();
+    }
+}
+
+// ==================== LIVE PACKET CAPTURE AUTO-START ====================
+
+// Auto-start packet capture when dashboard is shown
+let autoCapture = {
+    isRunning: false,
+    interval: null,
+    capturedPackets: [],
+    googleSearchDetected: false
+};
+
+// Monitor browser network requests for Google searches
+function monitorBrowserNetworkActivity() {
+    // Intercept fetch requests
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const url = args[0];
+        if (typeof url === 'string' && (
+            url.includes('google.com') || 
+            url.includes('search?') || 
+            url.includes('accounts.google')
+        )) {
+            console.log('Google search/activity detected:', url);
+            triggerGoogleActivityCapture();
+        }
+        return originalFetch.apply(this, args);
+    };
+}
+
+function triggerGoogleActivityCapture() {
+    // When Google activity is detected, capture current packets
+    if (currentCaptureData && currentCaptureData.detailed_packets) {
+        const googlePackets = currentCaptureData.detailed_packets.filter(packet => {
+            const isGoogle = packet.dns_query && (
+                packet.dns_query.toLowerCase().includes('google') ||
+                packet.dns_query.toLowerCase().includes('search')
+            );
+            return isGoogle;
+        });
+        
+        if (googlePackets.length > 0) {
+            showGoogleSearchNotification(googlePackets);
+        }
+    }
+}
+
+// Function to show notification when Google search is detected
+function showGoogleSearchNotification(packets) {
+    const notification = document.createElement('div');
+    notification.id = 'google-search-notification';
+    notification.style.cssText = `
+        position: fixed;
+        top: 120px;
+        right: 20px;
+        background: linear-gradient(135deg, #ff6b35 0%, #ff4500 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(255, 107, 53, 0.6);
+        z-index: 1000;
+        font-size: 14px;
+        font-weight: bold;
+        animation: slideIn 0.5s ease-out;
+        max-width: 350px;
+    `;
+    
+    const packetCount = packets.length;
+    const dnsQueries = packets.map(p => p.dns_query).filter(Boolean).join(', ');
+    
+    notification.innerHTML = `
+        <div style="margin-bottom: 10px;">🔍 GOOGLE SEARCH DETECTED</div>
+        <div style="font-size: 12px; margin-bottom: 8px;">
+            <strong>Packets Captured:</strong> ${packetCount}
+        </div>
+        <div style="font-size: 11px; color: #ffe0cc; word-break: break-word; margin-bottom: 8px;">
+            <strong>DNS Queries:</strong><br>${dnsQueries}
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="switchToPacketAnalysis()" style="flex: 1; padding: 8px; background: #ff8c42; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">View Packets</button>
+            <button onclick="dismissNotification('google-search-notification')" style="flex: 1; padding: 8px; background: rgba(255,255,255,0.2); border: 1px solid white; color: white; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">Dismiss</button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideOut 0.5s ease-in forwards';
+            setTimeout(() => notification.remove(), 500);
+        }
+    }, 10000);
+}
+
+function switchToPacketAnalysis() {
+    showTab('packet-analysis');
+    dismissNotification('google-search-notification');
+}
+
+function dismissNotification(id) {
+    const notification = document.getElementById(id);
+    if (notification) {
+        notification.style.animation = 'slideOut 0.5s ease-in forwards';
+        setTimeout(() => notification.remove(), 500);
+    }
+}
+
+// Add CSS animations if not already present
+function addNotificationStyles() {
+    if (!document.querySelector('style[data-notification]')) {
+        const style = document.createElement('style');
+        style.setAttribute('data-notification', 'true');
+        style.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            @keyframes slideOut {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// Initialize auto-packet capture on dashboard load
+document.addEventListener('dashboardLoaded', () => {
+    addNotificationStyles();
+    startAutoPacketCapture();
+});
+
+function startAutoPacketCapture() {
+    if (autoCapture.isRunning) return;
+    
+    autoCapture.isRunning = true;
+    
+    // Load available interfaces and start capture
+    fetch(`${API_BASE}/packet-interfaces`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.interfaces && data.interfaces.length > 0) {
+                // Auto-select first available interface
+                const selectedInterface = data.interfaces[0];
+                
+                // Start capture with moderate settings
+                performAutoCapture(selectedInterface);
+            }
+        })
+        .catch(err => console.log('Could not start auto packet capture:', err));
+}
+
+function performAutoCapture(interfaceName) {
+    // Capture packets in the background
+    fetch(`${API_BASE}/capture-packets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            interface: interfaceName,
+            count: 100,
+            duration: 60
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            currentCaptureData = data;
+            
+            // Check for Google search activity in captured packets
+            if (data.detailed_packets && data.detailed_packets.length > 0) {
+                const googlePackets = data.detailed_packets.filter(packet => {
+                    const query = packet.dns_query || '';
+                    return query.toLowerCase().includes('google') || 
+                           query.toLowerCase().includes('search');
+                });
+                
+                if (googlePackets.length > 0) {
+                    console.log(`Detected ${googlePackets.length} Google-related packets`);
+                    showGoogleSearchNotification(googlePackets);
+                }
+            }
+            
+            // Continue capturing in intervals
+            if (autoCapture.isRunning) {
+                setTimeout(() => {
+                    performAutoCapture(interfaceName);
+                }, 65000); // Restart capture after 65 seconds
+            }
+        }
+    })
+    .catch(err => console.log('Auto capture error:', err));
+}
+
+function stopAutoPacketCapture() {
+    autoCapture.isRunning = false;
+    if (autoCapture.interval) {
+        clearInterval(autoCapture.interval);
+    }
+}

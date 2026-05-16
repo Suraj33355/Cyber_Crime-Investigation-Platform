@@ -13,9 +13,13 @@ from modules.log_analyzer import LogAnalyzer
 from modules.network_scanner import NetworkScanner
 from modules.packet_analyzer import PacketAnalyzer
 from modules.threat_intelligence import ThreatIntelligence
+from modules.auth import auth_bp, token_required
 
 app = Flask(__name__, template_folder='../frontend', static_folder='../frontend/static')
 CORS(app)
+
+# Register blueprints
+app.register_blueprint(auth_bp)
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
@@ -56,7 +60,8 @@ def health_check():
 
 # ==================== LOG ANALYSIS ====================
 @app.route('/api/analyze-log', methods=['POST'])
-def analyze_log():
+@token_required
+def analyze_log(current_user):
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
@@ -85,14 +90,16 @@ def analyze_log():
 
 
 @app.route('/api/log-patterns', methods=['GET'])
-def get_log_patterns():
+@token_required
+def get_log_patterns(current_user):
     patterns = log_analyzer.get_supported_patterns()
     return jsonify({'patterns': patterns})
 
 
 # ==================== NETWORK SCANNING ====================
 @app.route('/api/scan-network', methods=['POST'])
-def scan_network():
+@token_required
+def scan_network(current_user):
     try:
         data = request.get_json()
         target = data.get('target', '').strip()
@@ -120,7 +127,8 @@ def scan_network():
 
 
 @app.route('/api/scan-port', methods=['POST'])
-def scan_port():
+@token_required
+def scan_port(current_user):
     try:
         data = request.get_json()
         target = data.get('target', '').strip()
@@ -150,7 +158,8 @@ def scan_port():
 
 # ==================== PACKET ANALYSIS ====================
 @app.route('/api/analyze-packets', methods=['POST'])
-def analyze_packets():
+@token_required
+def analyze_packets(current_user):
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
@@ -207,7 +216,8 @@ def get_packet_interfaces():
 
 # ==================== THREAT INTELLIGENCE ====================
 @app.route('/api/threat-detection', methods=['POST'])
-def threat_detection():
+@token_required
+def threat_detection(current_user):
     try:
         data = request.get_json()
         log_data = data.get('logs', [])
@@ -224,7 +234,8 @@ def threat_detection():
 
 
 @app.route('/api/threat-analysis/<threat_type>', methods=['GET'])
-def threat_analysis(threat_type):
+@token_required
+def threat_analysis(current_user, threat_type):
     try:
         if not threat_type or threat_type.strip() == '':
             return jsonify({'status': 'error', 'error': 'Threat type is required'}), 400
@@ -244,7 +255,8 @@ def threat_analysis(threat_type):
 
 
 @app.route('/api/check-ip-reputation', methods=['POST'])
-def check_ip_reputation():
+@token_required
+def check_ip_reputation(current_user):
     try:
         data = request.get_json()
         ip = data.get('ip', '').strip()
@@ -267,7 +279,8 @@ def check_ip_reputation():
 
 
 @app.route('/api/scrape-website', methods=['POST'])
-def scrape_website():
+@token_required
+def scrape_website(current_user):
     try:
         data = request.get_json()
         url = data.get('url', '').strip()
@@ -294,7 +307,8 @@ def scrape_website():
 
 # ==================== DASHBOARD ====================
 @app.route('/api/dashboard-stats', methods=['GET'])
-def dashboard_stats():
+@token_required
+def dashboard_stats(current_user):
     try:
         stats = {
             'total_logs_processed': 0,
@@ -308,7 +322,8 @@ def dashboard_stats():
 
 
 @app.route('/api/network-interfaces', methods=['GET'])
-def get_network_interfaces():
+@token_required
+def get_network_interfaces(current_user):
     try:
         interfaces = network_scanner.get_interfaces()
         return jsonify({'interfaces': interfaces})

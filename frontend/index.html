@@ -5,14 +5,143 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cybercrime Investigation Platform</title>
     <link rel="stylesheet" href="static/style.css">
+    <link rel="stylesheet" href="static/login.css">
 </head>
 <body>
-    <!-- Matrix background animation -->
-    <div class="matrix-background">
-        <canvas id="matrix-canvas"></canvas>
+    <!-- LOGIN SECTION - Shows First -->
+    <div id="login-container" class="login-view">
+        <div class="background-container">
+            <div class="background-glow"></div>
+        </div>
+
+        <div class="main-container">
+            <!-- Login Form Section -->
+            <div class="form-section">
+                <div class="form-container">
+                    <div class="form-header">
+                        <h1 class="welcome-text">Welcome</h1>
+                    </div>
+
+                    <!-- Form Tabs -->
+                    <div class="form-tabs">
+                        <button class="tab-btn tab-btn-active" data-tab="login">LOG IN</button>
+                        <button class="tab-btn" data-tab="signup">SIGN UP</button>
+                    </div>
+
+                    <!-- LOGIN FORM -->
+                    <form class="login-form form-tab active" id="loginForm" data-form="login">
+                        <div class="form-group">
+                            <label for="login-username" class="form-label">Username</label>
+                            <input 
+                                type="text" 
+                                id="login-username" 
+                                class="form-input" 
+                                placeholder="Enter your username"
+                                required
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="login-password" class="form-label">Password</label>
+                            <input 
+                                type="password" 
+                                id="login-password" 
+                                class="form-input" 
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
+
+                        <button type="submit" class="signin-button">Sign in</button>
+                    </form>
+
+                    <div class="form-footer" id="login-footer">
+                        <a href="#" class="footer-link toggle-tab" data-tab="signup">Create account</a>
+                    </div>
+
+                    <!-- SIGNUP FORM -->
+                    <form class="signup-form form-tab" id="signupForm" data-form="signup">
+                        <div class="form-group">
+                            <label for="signup-username" class="form-label">Username</label>
+                            <input 
+                                type="text" 
+                                id="signup-username" 
+                                class="form-input" 
+                                placeholder="Choose a username"
+                                required
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="signup-email" class="form-label">Email</label>
+                            <input 
+                                type="email" 
+                                id="signup-email" 
+                                class="form-input" 
+                                placeholder="Enter your email"
+                                required
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="signup-password" class="form-label">Password</label>
+                            <input 
+                                type="password" 
+                                id="signup-password" 
+                                class="form-input" 
+                                placeholder="Create a password"
+                                required
+                            />
+                            <div class="password-strength-container">
+                                <div class="password-strength-bar">
+                                    <div class="password-strength-fill" id="signup-strength-fill"></div>
+                                </div>
+                                <p class="password-strength-text">Password strength: <span class="strength-level" id="signup-strength-level">-</span></p>
+                            </div>
+                            <div class="password-rules-container" id="password-rules">
+                                <p class="password-rules-title">Password Requirements:</p>
+                                <ul class="password-rules-list">
+                                    <li id="rule-length" class="rule-unchecked">✓ At least 8 characters</li>
+                                    <li id="rule-lowercase" class="rule-unchecked">✓ At least one lowercase letter (a-z)</li>
+                                    <li id="rule-uppercase" class="rule-unchecked">✓ At least one uppercase letter (A-Z)</li>
+                                    <li id="rule-numbers" class="rule-unchecked">✓ At least one number (0-9)</li>
+                                    <li id="rule-symbols" class="rule-unchecked">✓ At least one special character (!@#$%)</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="signup-confirm-password" class="form-label">Confirm Password</label>
+                            <input 
+                                type="password" 
+                                id="signup-confirm-password" 
+                                class="form-input" 
+                                placeholder="Confirm your password"
+                                required
+                            />
+                        </div>
+
+                        <button type="submit" class="signup-button">Create Account</button>
+                    </form>
+
+                    <div class="form-footer" id="signup-footer">
+                        <span class="footer-text">Already have an account?</span>
+                        <span class="footer-divider">•</span>
+                        <a href="#" class="footer-link toggle-tab" data-tab="login">Log in</a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="container">
+    <!-- DASHBOARD SECTION - Shows After Login -->
+    <div id="dashboard-container" class="dashboard-view hidden">
+        <!-- Matrix background animation -->
+        <div class="matrix-background">
+            <canvas id="matrix-canvas"></canvas>
+        </div>
+
+        <div class="container">
         <!-- Navigation -->
         <nav class="navbar">
             <div class="nav-brand">
@@ -26,22 +155,13 @@
                 <li><a href="#" onclick="showTab('network-scan')">NETWORK SCAN</a></li>
                 <li><a href="#" onclick="showTab('packet-analysis')">PACKET ANALYSIS</a></li>
                 <li><a href="#" onclick="showTab('threat-intel')">THREAT INTEL</a></li>
+                <li><a href="#" onclick="logout()" class="nav-link-logout">LOGOUT</a></li>
             </ul>
-            <div class="status-indicator">
-                <span class="status-dot"></span>
-                <span class="status-text">SYSTEM ONLINE</span>
-            </div>
         </nav>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Dashboard Tab -->
+        <main>
+            <!-- Dashboard Tab (default) -->
             <section id="dashboard" class="tab-content active">
-                <div class="section-header">
-                    <h2 class="dashboard-title">COMMAND CENTER</h2>
-                    <div class="header-line"></div>
-                </div>
-
                 <div class="dashboard-grid">
                     <div class="stat-card stat-card-1">
                         <div class="card-scanner"></div>
@@ -181,7 +301,30 @@
                         <h3>🌐 EXTRACTED IPs</h3>
                         <div id="log-ips" class="ip-list"></div>
                     </div>
-                </div>
+
+                    <div class="card chart-card-large">
+                        <div class="card-title-line"></div>
+                        <h3>📊 THREAT LEVELS DISTRIBUTION</h3>
+                        <div class="chart-container-large">
+                            <canvas id="log-threats-chart" class="chart-canvas-large"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card chart-card-large">
+                        <div class="card-title-line"></div>
+                        <h3>🔍 TOP 10 PATTERN MATCHES</h3>
+                        <div class="chart-container-large">
+                            <canvas id="log-patterns-chart" class="chart-canvas-large"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card chart-card-large">
+                        <div class="card-title-line"></div>
+                        <h3>⚠️ THREAT SUMMARY</h3>
+                        <div class="chart-container-large">
+                            <canvas id="log-summary-chart" class="chart-canvas-large"></canvas>
+                        </div>
+                    </div>
             </section>
 
             <!-- Network Scan Tab -->
@@ -313,7 +456,7 @@
                     </div>
 
                     <div class="card">
-                        <h3>Live Packet Capture</h3>
+                        <h3>🔴 Live Packet Capture</h3>
                         <form id="capture-form" class="form-group">
                             <div>
                                 <label for="capture-interface">Network Interface:</label>
@@ -329,7 +472,7 @@
                                 <label for="capture-duration">Timeout (seconds):</label>
                                 <input type="number" id="capture-duration" min="1" max="600" value="30" required>
                             </div>
-                            <button type="submit" class="btn btn-primary">Start Capture</button>
+                            <button type="submit" class="btn btn-primary">🎯 Start Capture</button>
                             <p class="warning-text">⚠️ Requires Administrator/sudo access</p>
                         </form>
                         <div id="capture-loading" class="loading hidden">
@@ -552,8 +695,168 @@
                 </div>
             </section>
         </main>
+        </div>
     </div>
 
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="static/login.js"></script>
     <script src="static/script.js"></script>
+    <script>
+        // Authentication Management
+        let loginContainer, dashboardContainer;
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            loginContainer = document.getElementById('login-container');
+            dashboardContainer = document.getElementById('dashboard-container');
+            
+            // Initialize network activity monitoring
+            if (typeof monitorBrowserNetworkActivity === 'function') {
+                monitorBrowserNetworkActivity();
+            }
+            
+            const token = localStorage.getItem('authToken');
+            
+            if (token) {
+                // Verify token with backend before showing dashboard
+                try {
+                    const response = await fetch('http://localhost:5000/api/auth/verify-token', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        // Token is valid - show dashboard
+                        showDashboard();
+                    } else {
+                        // Token is invalid/expired - clear and show login
+                        localStorage.removeItem('authToken');
+                        localStorage.removeItem('username');
+                        showLogin();
+                    }
+                } catch (error) {
+                    console.error('Token verification error:', error);
+                    // If can't verify (server down?), clear token and show login for security
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('username');
+                    showLogin();
+                }
+            } else {
+                // No token - show login
+                showLogin();
+            }
+        });
+
+        function showLogin() {
+            if (loginContainer) loginContainer.classList.remove('hidden');
+            if (dashboardContainer) dashboardContainer.classList.add('hidden');
+            
+            // Initialize lamp controller
+            if (typeof AuthControllerWithGSAP !== 'undefined' && !window.authController) {
+                window.authController = new AuthControllerWithGSAP();
+            } else if (typeof AuthController !== 'undefined' && !window.authController) {
+                window.authController = new AuthController();
+            }
+        }
+
+        function showDashboard() {
+            if (loginContainer) loginContainer.classList.add('hidden');
+            if (dashboardContainer) dashboardContainer.classList.remove('hidden');
+            
+            // Initialize dashboard
+            if (typeof initMatrixRain === 'function') {
+                try {
+                    initMatrixRain();
+                    initDashboardStats();
+                } catch(e) {
+                    console.log('Dashboard init:', e.message);
+                }
+            }
+        }
+
+        function logout() {
+            // Confirm logout
+            if (!confirm('Are you sure you want to logout?')) {
+                return;
+            }
+            
+            // Clear authentication
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('username');
+            
+            // Clear dashboard stats
+            localStorage.removeItem('logs_processed');
+            localStorage.removeItem('threats_detected');
+            localStorage.removeItem('networks_scanned');
+            localStorage.removeItem('packets_analyzed');
+            
+            // Reset ALL button loading states
+            const signinBtn = document.querySelector('.signin-button');
+            const signupBtn = document.querySelector('.signup-button');
+            if (signinBtn) {
+                signinBtn.disabled = false;
+                signinBtn.classList.remove('loading');
+                signinBtn.textContent = 'Sign in';
+            }
+            if (signupBtn) {
+                signupBtn.disabled = false;
+                signupBtn.classList.remove('loading');
+                signupBtn.textContent = 'Create Account';
+            }
+            
+            // Reset forms
+            if (document.getElementById('loginForm')) {
+                document.getElementById('loginForm').reset();
+            }
+            if (document.getElementById('signupForm')) {
+                document.getElementById('signupForm').reset();
+            }
+            
+            // Reset bulbs
+            const bulbs = document.querySelectorAll('.bulb');
+            bulbs.forEach(bulb => bulb.classList.remove('bulb-active'));
+            const authController = window.authController;
+            if (authController) {
+                authController.clickedBulbs.clear();
+            }
+            
+            // Hide form section
+            const formSection = document.querySelector('.form-section');
+            if (formSection) {
+                formSection.style.display = 'none';
+                formSection.style.opacity = '0';
+                formSection.style.transform = 'translateX(40px)';
+            }
+            document.body.classList.remove('lamp-active');
+            
+            // Show login screen
+            showLogin();
+        }
+    </script>
+
+    <!-- SUSPICIOUS IP ALERT MODAL -->
+    <div id="alert-modal-overlay" class="alert-modal-overlay">
+        <div class="alert-modal">
+            <div class="alert-modal-header">💀</div>
+            <div class="alert-modal-title">SUSPICIOUS IP DETECTED!</div>
+            <div class="alert-modal-message">A potentially malicious IP address has been found in your analysis</div>
+            <div class="alert-modal-content">
+                <h4>Threat Details:</h4>
+                <p id="alert-modal-ip">IP: <span class="highlighted" id="alert-ip-text">-</span></p>
+                <p id="alert-modal-type">Threat Type: <span class="highlighted" id="alert-type-text">-</span></p>
+                <p id="alert-modal-severity">Severity: <span class="highlighted" id="alert-severity-text">-</span></p>
+                <p id="alert-modal-details">Details: <span class="highlighted" id="alert-details-text">-</span></p>
+            </div>
+            <div class="alert-modal-buttons">
+                <button class="alert-modal-btn" onclick="closeAlertModal()">DISMISS</button>
+                <button class="alert-modal-btn" onclick="investigateIP()">INVESTIGATE</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
